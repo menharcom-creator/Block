@@ -1,0 +1,49 @@
+name: Build APK and IPA
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm install
+      - run: npx cap add android
+      - name: Android TV + fullscreen manifest tweaks
+        run: |
+          python3 - <<'PY'
+          p='android/app/src/main/AndroidManifest.xml'; s=open(p).read()
+          s=s.replace('<application','<uses-feature android:name="android.software.leanback" android:required="false"/><uses-feature android:name="android.hardware.touchscreen" android:required="false"/><application',1)
+          s=s.replace('<category android:name="android.intent.category.LAUNCHER" />','<category android:name="android.intent.category.LAUNCHER" /><category android:name="android.intent.category.LEANBACK_LAUNCHER" />')
+          open(p,'w').write(s)
+          PY
+      - run: npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BlockForge-android
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - run: npx cap add ios
+      - run: npx cap sync ios
+      - name: Build unsigned IPA
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -sdk iphoneos \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qr BlockForge-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: BlockForge-ios-unsigned, path: ios/App/BlockForge-unsigned.ipa }
