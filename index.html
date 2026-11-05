@@ -1,0 +1,427 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>BlockForge</title>
+<style>
+:root{--bg:#10171a;--panel:#1a2529ee;--line:#34464c;--ink:#e9efe6;--dim:#93a79f;--amber:#ffb23e;--moss:#6fbf5a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;color:var(--ink);font:15px/1.35 "Trebuchet MS","Segoe UI",Roboto,sans-serif;touch-action:none}
+canvas{position:fixed;inset:0;width:100%;height:100%}#hud{pointer-events:none}
+button,.btn,select,input:not([type=checkbox]):not([type=range]){font:inherit;color:var(--ink);background:#2a393e;border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:3px}
+button,.btn{cursor:pointer;display:inline-block}button:active,.btn:active{background:var(--amber);color:#1b1200}
+button:focus-visible,.btn:focus-within{outline:2px solid var(--amber)}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(180deg,#0b1113cc,#10171af2),#10171a;z-index:10;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#logo{padding:14px 18px 0;font-size:28px;font-weight:800;letter-spacing:.5px}#logo i{font-style:normal;color:var(--amber)}
+#tabs{display:flex;gap:4px;padding:8px 14px;overflow-x:auto}#tabs b{padding:9px 14px;border-radius:10px;background:#1d2b30;cursor:pointer;white-space:nowrap;font-weight:600}#tabs b.on{background:var(--amber);color:#1b1200}
+#mbody{flex:1;overflow:auto;padding:6px 14px 24px;touch-action:pan-y;user-select:text}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0;max-width:760px}.card h3{margin:0 0 6px}small{color:var(--dim)}
+.card input[type=range]{vertical-align:middle}pre{white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:90px;overflow:auto;background:#0d1417;padding:6px;border-radius:8px}
+textarea{width:100%;height:70px;background:#0d1417;color:var(--ink);border:1px solid var(--line);border-radius:8px}
+#hot{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);display:none;gap:3px;z-index:3}
+#hot div{width:46px;height:46px;border:2px solid #fff4;border-radius:8px;background:#0008 center/32px no-repeat;position:relative;image-rendering:pixelated}
+#hot div.s{border-color:var(--amber);box-shadow:0 0 8px var(--amber)}#hot div span{position:absolute;right:2px;bottom:0;font-size:12px;font-weight:700;text-shadow:0 0 3px #000}
+#stats{position:fixed;left:50%;bottom:calc(62px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(420px,70vw);display:none;gap:8px;z-index:3}
+#stats div{flex:1;height:9px;background:#0007;border-radius:5px;overflow:hidden}#stats i{display:block;height:100%}
+#info{position:fixed;left:calc(8px + env(safe-area-inset-left));top:calc(6px + env(safe-area-inset-top));font-size:12px;text-shadow:0 0 3px #000;z-index:3;pointer-events:none}
+#toast{position:fixed;top:14%;left:50%;transform:translateX(-50%);background:#000a;padding:8px 14px;border-radius:10px;z-index:12;display:none;max-width:80vw;text-align:center}
+#inv{position:fixed;inset:5% 4%;background:var(--panel);border:1px solid var(--line);border-radius:16px;z-index:9;display:none;overflow:auto;padding:12px;touch-action:pan-y}
+.slot{display:inline-block;width:52px;height:52px;margin:3px;border:2px solid var(--line);border-radius:8px;background:#0008 center/36px no-repeat;position:relative;vertical-align:top;cursor:pointer}
+.slot span{position:absolute;right:2px;bottom:0;font-size:12px;font-weight:700;text-shadow:0 0 3px #000}
+#touch{position:fixed;inset:0;display:none;pointer-events:none;z-index:4}#touch button{position:absolute;pointer-events:auto;width:58px;height:58px;border-radius:50%;background:#0006;border:2px solid #fff5;font-size:22px;padding:0;margin:0}
+#joy{position:fixed;width:110px;height:110px;border-radius:50%;border:2px solid #fff5;background:#fff1;display:none;z-index:4;pointer-events:none}#joy i{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff6}
+</style></head><body>
+<canvas id="gl"></canvas><canvas id="hud"></canvas>
+<div id="info"></div><div id="stats"><div><i style="background:#e5484d" id="hp"></i></div><div><i style="background:var(--amber)" id="fd"></i></div></div>
+<div id="hot"></div><div id="toast"></div><div id="joy"><i></i></div>
+<div id="touch"><button id="bJ" style="right:84px;bottom:110px">⤒</button><button id="bB" style="right:20px;bottom:150px">⛏</button><button id="bP" style="right:20px;bottom:64px">▣</button><button id="bF" style="right:148px;bottom:150px">✈</button><button id="bI" style="right:84px;top:12px;width:46px;height:46px">🎒</button><button id="bM" style="right:20px;top:12px;width:46px;height:46px">☰</button></div>
+<div id="inv"></div>
+<div id="menu"><div id="logo">Block<i>Forge</i></div><div id="tabs"></div><div id="mbody"></div></div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s),H=64,SEA=22,TS=64;
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const S=Object.assign({rd:4,fov:75,sc:1,sens:1,coords:1},JSON.parse(localStorage.bf||'{}'));
+const saveS=()=>localStorage.bf=JSON.stringify(S);
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600)}
+/* ---------- noise ---------- */
+function hash2(x,y,s){let h=Math.imul(x|0,374761393)+Math.imul(y|0,668265263)+Math.imul(s|0,1274126177)|0;h=Math.imul(h^h>>>13,1274126177);return((h^h>>>16)>>>0)/4294967296}
+function vnoise(x,y,s){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf),a=hash2(xi,yi,s),b=hash2(xi+1,yi,s),c=hash2(xi,yi+1,s),d=hash2(xi+1,yi+1,s);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
+function fbm(x,y,s,o=4){let t=0,a=.5,f=1;for(let i=0;i<o;i++){t+=a*vnoise(x*f,y*f,s+i*101);a*=.5;f*=2}return t}
+const strSeed=s=>{s=String(s||'');if(/^-?\d+$/.test(s))return parseInt(s)|0;let h=7;for(const c of s)h=Math.imul(h,31)+c.charCodeAt(0)|0;return h};
+/* ---------- zip ---------- */
+const CT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^c>>>1:c>>>1;t[n]=c>>>0}return t})();
+const crc=u=>{let c=~0;for(let i=0;i<u.length;i++)c=CT[(c^u[i])&255]^c>>>8;return ~c>>>0};
+function makeZip(files){const enc=new TextEncoder(),parts=[],cd=[];let off=0;const names=Object.keys(files);
+ for(const name of names){const nb=enc.encode(name),u=files[name],c=crc(u),h=new DataView(new ArrayBuffer(30));
+  h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint32(14,c,true);h.setUint32(18,u.length,true);h.setUint32(22,u.length,true);h.setUint16(26,nb.length,true);
+  parts.push(new Uint8Array(h.buffer),nb,u);
+  const e=new DataView(new ArrayBuffer(46));e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint32(16,c,true);e.setUint32(20,u.length,true);e.setUint32(24,u.length,true);e.setUint16(28,nb.length,true);e.setUint32(42,off,true);
+  cd.push(new Uint8Array(e.buffer),nb);off+=30+nb.length+u.length}
+ const cs=cd.reduce((a,b)=>a+b.length,0),en=new DataView(new ArrayBuffer(22));en.setUint32(0,0x06054b50,true);en.setUint16(8,names.length,true);en.setUint16(10,names.length,true);en.setUint32(12,cs,true);en.setUint32(16,off,true);
+ return new Blob([...parts,...cd,new Uint8Array(en.buffer)])}
+async function inflate(u8){if(typeof DecompressionStream==='undefined')throw Error('This WebView cannot unpack compressed zips. Update Android System WebView.');const ds=new DecompressionStream('deflate-raw'),w=ds.writable.getWriter();w.write(u8);w.close();return new Uint8Array(await new Response(ds.readable).arrayBuffer())}
+async function readZip(u){const dv=new DataView(u.buffer,u.byteOffset,u.byteLength);let e=u.length-22;while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw Error('Not a valid zip/mc file');
+ const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const m=new Map(),dec=new TextDecoder();
+ for(let i=0;i<n;i++){const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),name=dec.decode(u.subarray(p+46,p+46+nl));p+=46+nl+el+cl;
+  if(name.endsWith('/'))continue;
+  m.set(name,async()=>{const s=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true),raw=u.subarray(s,s+cs);return meth===0?raw:await inflate(raw)})}
+ return m}
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)};
+const pjson=t=>{t=t.replace(/^\uFEFF/,'');try{return JSON.parse(t)}catch(e){return JSON.parse(t.replace(/^\s*\/\/.*$/gm,'').replace(/,(\s*[}\]])/g,'$1'))}};
+async function saveFile(name,blob){const C=window.Capacitor;try{if(C&&C.Plugins&&C.Plugins.Filesystem&&C.Plugins.Share){const data=b64(new Uint8Array(await blob.arrayBuffer()));const r=await C.Plugins.Filesystem.writeFile({path:name,data,directory:'CACHE'});await C.Plugins.Share.share({title:name,url:r.uri,dialogTitle:'Save or share '+name});return}}catch(e){if(String(e).includes('anceled'))return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),9000)}
+/* ---------- storage ---------- */
+const DB=new Promise((res,rej)=>{const r=indexedDB.open('blockforge',1);r.onupgradeneeded=()=>['worlds','backups','packs'].forEach(n=>r.result.createObjectStore(n,{keyPath:'id'}));r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const tx=(s,m,f)=>DB.then(d=>new Promise((res,rej)=>{const t=d.transaction(s,m),r=f(t.objectStore(s));t.oncomplete=()=>res(r&&r.result);t.onerror=()=>rej(t.error)}));
+const dbAll=s=>tx(s,'readonly',o=>o.getAll()),dbPut=(s,v)=>tx(s,'readwrite',o=>o.put(v)),dbDel=(s,k)=>tx(s,'readwrite',o=>o.delete(k));
+/* ---------- blocks & items ---------- */
+const BASE={1:['Grass',[0,1,2],.6],2:['Dirt',[2,2,2],.5],3:['Stone',[3,3,3],3],4:['Sand',[4,4,4],.5],5:['Water',[5,5,5],0],6:['Log',[6,7,6],2],7:['Leaves',[8,8,8],.2],8:['Planks',[9,9,9],1.5],9:['Cobblestone',[10,10,10],3],10:['Snow',[11,21,2],.3],11:['Glass',[12,12,12],.3],12:['Coal Ore',[13,13,13],3.5],13:['Crafting Table',[14,15,9],1.5],14:['Farmland',[16,2,2],.5],15:['Wheat',[17,17,17],0],16:['Lamp',[18,18,18],.5],17:['Bedrock',[19,19,19],-1],18:['Ripe Wheat',[22,22,22],0]};
+const IT={100:['Coal','#2b2b2b'],101:['Wheat','#d9b44a'],102:['Bread','#b9772e'],103:['Seeds','#7ab648'],104:['Raw Meat','#d95b6b']};
+const UNK={n:'Unknown',t:[20,20,20],h:1};let BL={};
+const B=b=>BL[b]||UNK,nameOf=id=>BL[id]?BL[id].n:IT[id]?IT[id][0]:'?';
+function resetBL(){BL={};for(const k in BASE){const[n,t,h]=BASE[k];BL[k]={n,t:t.slice(),h,fl:k==5,cut:[7,11,15,18].includes(+k),plant:k==15||k==18,emit:k==16}}}resetBL();
+const RECIPES=[{o:[8,4],i:[[6,1]],n:'Planks'},{o:[13,1],i:[[8,4]],n:'Crafting Table'},{o:[11,1],i:[[4,2]],n:'Glass (smelt sand)'},{o:[16,1],i:[[11,1],[100,1]],n:'Lamp'},{o:[14,1],i:[[2,1],[8,1]],n:'Farmland (till)'},{o:[102,1],i:[[101,3]],n:'Bread'},{o:[9,2],i:[[3,2]],n:'Cobblestone (cut)'}];
+/* ---------- textures ---------- */
+const AL={0:['grass_top','grass_carried','grass_block_top'],1:['grass_side','grass_side_carried','grass_block_side'],2:['dirt'],3:['stone'],4:['sand'],5:['water_still','water'],6:['log_oak_top','log_top','oak_log_top'],7:['log_oak','log_side','oak_log'],8:['leaves_oak','leaves','oak_leaves'],9:['planks_oak','planks','oak_planks'],10:['cobblestone'],11:['snow'],12:['glass'],13:['coal_ore'],14:['crafting_table_top'],15:['crafting_table_side'],16:['farmland_dry','farmland','farmland_top'],17:['wheat_stage_0','wheat_stage0'],18:['glowstone','lamp','redstone_lamp_on'],19:['bedrock'],21:['grass_side_snowed','snow_side'],22:['wheat_stage_7','wheat_stage7']};
+const TBASE=[[96,160,60],[134,96,67],[134,96,67],[125,125,128],[222,205,150],[50,100,200],[170,135,85],[102,81,50],[56,130,40],[176,140,86],[110,110,110],[245,248,252],[200,230,240],[125,125,128],[176,140,86],[176,140,86],[90,58,35],[80,160,50],[255,215,120],[40,40,40],[255,255,255],[134,96,67],[220,190,60]];
+function procTile(i,mul,col){const c=document.createElement('canvas');c.width=c.height=TS;const x=c.getContext('2d'),im=x.createImageData(TS,TS),d=im.data;
+ const base=col||TBASE[i]||[255,0,255];
+ for(let py=0;py<TS;py++)for(let px=0;px<TS;px++){let[r,g,b]=base,a=255,k=.75+.35*(hash2(px>>1,py>>1,i)*.6+vnoise(px/8,py/8,i)*.4);
+  if((i==1||i==21)&&py<10+(hash2(px,9,1)*9|0))[r,g,b]=i==1?TBASE[0]:TBASE[11];
+  else if(i==6){k*=.85+.15*Math.sin(Math.hypot(px-32,py-32)*.7)}
+  else if(i==7){k*=.8+.2*Math.sin(px*.9+hash2(px,0,2)*3)}
+  else if(i==8){if(hash2(px>>2,py>>2,8)<.2)a=0;k*=.9}
+  else if(i==9||i==14||i==15){if(py%16<2)k*=.6;if(i==14&&px%32<2)k*=.6;if(i==15&&px>20&&px<40&&py>20&&py<44){r=90;g=90;b=100}}
+  else if(i==10){const o=(py>>4)%2*8;if(py%16<2||(px+o)%16<2)k*=.5}
+  else if(i==12){const e=px<3||py<3||px>60||py>60;a=e?255:(Math.abs(px-py)<3&&px>8&&px<32?90:0)}
+  else if(i==13){if(vnoise(px/5,py/5,13)>.72){r=g=b=30}}
+  else if(i==16){if(py%16<3)k*=.65}
+  else if(i==17||i==22){const st=(px%12)<3&&py>6+(hash2(px/12|0,0,i)*14|0);a=st?255:0;if(i==17){r=70;g=150;b=50}}
+  else if(i==18){k=1.1+.25*Math.cos(Math.hypot(px-32,py-32)/6);if(px%32<2||py%32<2)k=.6}
+  else if(i==5){a=170}else if(i==19)k=.4+.9*hash2(px,py,19);else if(i==20)k=1;
+  const j=(py*TS+px)*4,m=mul||[1,1,1];d[j]=Math.min(255,r*k*m[0]);d[j+1]=Math.min(255,g*k*m[1]);d[j+2]=Math.min(255,b*k*m[2]);d[j+3]=a}
+ x.putImageData(im,0,0);return c}
+const AT=document.createElement('canvas');AT.width=AT.height=TS*8;const ax=AT.getContext('2d');
+const loadImg=u=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=u});
+let packs=[],iconCache={};
+async function putTile(slot,url,gray){try{const im=await loadImg(url),c=document.createElement('canvas');c.width=c.height=TS;const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.drawImage(im,0,0,im.width,Math.min(im.height,im.width),0,0,TS,TS);
+ if(gray){const id=x.getImageData(0,0,TS,TS),d=id.data;let sp=0,n=0;for(let i=0;i<d.length;i+=4)if(d[i+3]>128){sp+=Math.max(d[i],d[i+1],d[i+2])-Math.min(d[i],d[i+1],d[i+2]);n++}
+  if(n&&sp/n<14)for(let i=0;i<d.length;i+=4){d[i]*=.55;d[i+1]*=.85;d[i+2]*=.35}x.putImageData(id,0,0)}
+ ax.clearRect((slot%8)*TS,(slot>>3)*TS,TS,TS);ax.drawImage(c,(slot%8)*TS,(slot>>3)*TS)}catch(e){}}
+const actPacks=k=>packs.filter(p=>p.active&&p.kind===k).sort((a,b)=>a.order-b.order);
+async function applyPacks(){
+ const ids=G?G.w.cust.slice():[],defs=new Map();
+ for(const p of actPacks('behavior'))for(const b of p.blocks){defs.set(b.id,b);if(!ids.includes(b.id))ids.push(b.id)}
+ if(G)G.w.cust=ids;resetBL();
+ ax.clearRect(0,0,AT.width,AT.height);for(let i=0;i<23;i++)ax.drawImage(procTile(i),(i%8)*TS,(i>>3)*TS);
+ const rp=actPacks('resource');
+ for(const p of rp){for(const i in p.tiles)await putTile(+i,p.tiles[i]);
+  for(const i in AL){if(p.tiles[i])continue;for(const nm of AL[i])if(p.tex&&p.tex[nm]){await putTile(+i,p.tex[nm],i==0||i==8);break}}}
+ for(let i=0;i<ids.length&&i<40;i++){const id=32+i,d=defs.get(ids[i]),short=ids[i].split(':').pop(),slot=23+i;let url=null;
+  for(const p of rp)if(p.tex&&p.tex[short])url=p.tex[short];if(!url&&d&&d.tex)url=d.tex;
+  if(url)await putTile(slot,url);else{const col=d&&d.color?[1,3,5].map(o=>parseInt(d.color.slice(o,o+2),16)):[255,0,255];ax.drawImage(procTile(slot,null,col),(slot%8)*TS,(slot>>3)*TS)}
+  BL[id]={n:d?d.name:'Missing '+ids[i],t:[slot,slot,slot],h:d&&d.hard!=null?d.hard:1.5,emit:d&&d.emit,cust:1}}
+ iconCache={};if(gl){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,AT)}
+ if(G){for(const c of G.chunks.values())c.dirty=true;rebuildHot()}}
+function icon(id){if(iconCache[id])return iconCache[id];const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.imageSmoothingEnabled=false;
+ if(BL[id]){const t=BL[id].t[1];x.drawImage(AT,(t%8)*TS,(t>>3)*TS,TS,TS,0,0,40,40)}else if(IT[id]){x.fillStyle=IT[id][1];x.beginPath();x.arc(20,20,14,0,7);x.fill();x.fillStyle='#fff8';x.font='bold 16px sans-serif';x.textAlign='center';x.fillText(IT[id][0][0],20,26)}
+ return iconCache[id]='url('+c.toDataURL()+')'}
+/* ---------- WebGL ---------- */
+const cv=$('#gl'),hudc=$('#hud'),hx=hudc.getContext('2d');let gl=cv.getContext('webgl',{antialias:false,alpha:false}),tex,prog,U={};
+if(gl){const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);return o};prog=gl.createProgram();
+ gl.attachShader(prog,sh(gl.VERTEX_SHADER,'attribute vec3 p;attribute vec2 t;attribute float l;uniform mat4 m;varying vec2 vt;varying float vl,vd;void main(){gl_Position=m*vec4(p,1.);vt=t;vl=l;vd=gl_Position.w;}'));
+ gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,'precision mediump float;uniform sampler2D s;uniform float day,fogd;uniform vec3 fc;uniform vec4 tint;varying vec2 vt;varying float vl,vd;void main(){vec4 c=texture2D(s,vt);if(c.a<.5&&tint.a>=1.)discard;float L=vl>1.5?1.:vl*mix(.3,1.,day);c.rgb*=L*tint.rgb;float f=clamp((vd-fogd*.55)/(fogd*.45),0.,1.);c.rgb=mix(c.rgb,fc,f);gl_FragColor=vec4(c.rgb,tint.a<1.?c.a*tint.a:1.);}'));
+ gl.linkProgram(prog);gl.useProgram(prog);for(const n of['m','s','day','fogd','fc','tint'])U[n]=gl.getUniformLocation(prog,n);
+ tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+ for(const[n,s,o]of[['p',3,0],['t',2,12],['l',1,20]]){const a=gl.getAttribLocation(prog,n);gl.enableVertexAttribArray(a);U['a'+n]=[a,s,o]}}
+const mul=(a,b)=>{const o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s}return o};
+const persp=(fv,as,n,f)=>{const t=1/Math.tan(fv/2);return new Float32Array([t/as,0,0,0,0,t,0,0,0,0,(f+n)/(n-f),-1,0,0,2*f*n/(n-f),0])};
+const rotX=a=>{const c=Math.cos(a),s=Math.sin(a);return new Float32Array([1,0,0,0,0,c,s,0,0,-s,c,0,0,0,0,1])};
+const rotY=a=>{const c=Math.cos(a),s=Math.sin(a);return new Float32Array([c,0,-s,0,0,1,0,0,s,0,c,0,0,0,0,1])};
+const trans=(x,y,z)=>new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]);
+const FACES=[{d:[0,1,0],c:[[0,1,0],[0,1,1],[1,1,1],[1,1,0]],s:1,k:0},{d:[0,-1,0],c:[[0,0,1],[0,0,0],[1,0,0],[1,0,1]],s:.5,k:2},{d:[1,0,0],c:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]],s:.8,k:1},{d:[-1,0,0],c:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]],s:.8,k:1},{d:[0,0,1],c:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],s:.65,k:1},{d:[0,0,-1],c:[[1,0,0],[0,0,0],[0,1,0],[1,1,0]],s:.65,k:1}];
+const UVS=[[0,1],[1,1],[1,0],[0,0]],QI=[0,1,2,0,2,3];
+function pushFace(a,F,x,y,z,tile,l){const tx=(tile%8)/8,ty=(tile>>3)/8,e=.0008;for(const q of QI){const c=F.c[q],u=UVS[q];a.push(x+c[0],y+c[1],z+c[2],tx+(u[0]?.125-e:e),ty+(u[1]?.125-e:e),l)}}
+/* ---------- world ---------- */
+let G=null,SEED=1,AMP=1,paused=true,packsLoaded=false;
+const ck=(cx,cz)=>(cx+32768)*65536+(cz+32768);
+function hAt(x,z){const c=fbm(x/180,z/180,SEED),m=fbm(x/90,z/90,SEED+7),mt=Math.max(0,m-.52)*80;return Math.max(3,Math.min(H-4,Math.floor(24+(c-.5)*50*AMP+mt*AMP)))}
+function biome(x,z){const t=fbm(x/260,z/260,SEED+33);if(t<.37)return 3;if(t>.63)return 2;return fbm(x/70,z/70,SEED+55)>.52?1:0}
+const cave=(x,y,z)=>Math.abs(vnoise(x/16+y/11,z/16,SEED+5)-.5)<.06&&Math.abs(vnoise(x/16,z/16+y/9,SEED+6)-.5)<.06;
+const HOUSES=[[-14,-6],[6,-8],[-6,8],[12,6],[0,-16]];
+function village(rx,rz){if(hash2(rx,rz,SEED+500)>.4)return null;const x=rx*96+20+(hash2(rx,rz,SEED+501)*56|0),z=rz*96+20+(hash2(rz,rx,SEED+502)*56|0),h=hAt(x,z),bi=biome(x,z);if(bi>1||h<=SEA+2||h>40)return null;return{x,z,h}}
+function genChunk(cx,cz){const d=new Uint8Array(16*H*16),hs=new Int16Array(576),bm=new Uint8Array(576),spawns=[];
+ for(let z=-4;z<20;z++)for(let x=-4;x<20;x++){hs[(z+4)*24+x+4]=hAt(cx*16+x,cz*16+z);bm[(z+4)*24+x+4]=biome(cx*16+x,cz*16+z)}
+ const set=(x,y,z,b)=>{if(x>=0&&x<16&&z>=0&&z<16&&y>=0&&y<H)d[(y*16+z)*16+x]=b};
+ for(let z=0;z<16;z++)for(let x=0;x<16;x++){const wx=cx*16+x,wz=cz*16+z,h=hs[(z+4)*24+x+4],bi=bm[(z+4)*24+x+4];
+  for(let y=0;y<=h;y++){let b;if(y==0)b=17;else if(y<h-3)b=hash2(wx*7+y,wz,SEED+9)<.012?12:3;else if(y<h)b=(bi==2||h<=SEA+1)?4:2;
+   else b=(h<=SEA+1||bi==2)?4:h>=54?10:h>=46?3:bi==3?10:1;
+   if(y>3&&y<h-2&&cave(wx,y,wz))b=0;d[(y*16+z)*16+x]=b}
+  for(let y=h+1;y<=SEA;y++)d[(y*16+z)*16+x]=5}
+ for(let z=-2;z<18;z++)for(let x=-2;x<18;x++){const i=(z+4)*24+x+4,h=hs[i],bi=bm[i];if(h<=SEA+1||bi==2||h>=46)continue;
+  if(hash2(cx*16+x,cz*16+z,SEED+99)<(bi==1?.05:bi==3?.015:.006)){const th=4+(hash2(x,z,cx+cz)*3|0);for(let y=1;y<=th;y++)set(x,h+y,z,6);
+   for(let dy=th-2;dy<=th+1;dy++){const r=dy>=th?1:2;for(let dx=-r;dx<=r;dx++)for(let dz=-r;dz<=r;dz++)if((Math.abs(dx)+Math.abs(dz)<r*2||!r)&&!(dx==0&&dz==0&&dy<th))set(x+dx,h+dy,z+dz,7)}}}
+ for(let rx=Math.floor(cx/6)-1;rx<=Math.floor(cx/6)+1;rx++)for(let rz=Math.floor(cz/6)-1;rz<=Math.floor(cz/6)+1;rz++){const v=village(rx,rz);if(!v)continue;
+  for(const[ox,oz]of HOUSES){const x0=v.x+ox-cx*16,z0=v.z+oz-cz*16,y0=v.h;if(x0<-8||x0>16||z0<-8||z0>16)continue;
+   for(let dx=-1;dx<=5;dx++)for(let dz=-1;dz<=5;dz++){const x=x0+dx,z=z0+dz;if(x<0||x>15||z<0||z>15)continue;for(let y=1;y<y0;y++)if(!d[(y*16+z)*16+x])set(x,y,z,2);for(let y=y0+1;y<y0+7;y++)set(x,y,z,0);set(x,y0,z,dx<0||dx>4||dz<0||dz>4?2:8);
+    if(dx>=0&&dx<=4&&dz>=0&&dz<=4){const edge=dx==0||dx==4||dz==0||dz==4;for(let y=1;y<=3;y++){if(edge&&!(dx==2&&dz==0&&y<3))set(x,y0+y,z,y==2&&(dx==2||dz==2)?11:8)}set(x,y0+4,z,8)}}
+   set(x0+2,y0+3,z0+2,16);if(x0+2>=0&&x0+2<16&&z0+2>=0&&z0+2<16)spawns.push([cx*16+x0+2.5,y0+1,cz*16+z0+2.5])}}
+ const top=new Uint8Array(256);for(let i=0;i<256;i++){let y=H-1;while(y>0){const b=d[(y*16+(i>>4))*16+(i&15)];if(b&&b!=15&&b!=18)break;y--}top[i]=y}
+ return{cx,cz,d,top,dirty:true,spawns}}
+function get(x,y,z){if(y<0)return 17;if(y>=H)return 0;const c=G.chunks.get(ck(x>>4,z>>4));return c?c.d[(y*16+(z&15))*16+(x&15)]:1}
+const getTop=(x,z)=>{const c=G.chunks.get(ck(x>>4,z>>4));return c?c.top[(z&15)*16+(x&15)]:0};
+function setBlock(x,y,z,b,net){if(y<0||y>=H)return;const cx=x>>4,cz=z>>4,c=G.chunks.get(ck(cx,cz));if(!c)return;const i=(y*16+(z&15))*16+(x&15);c.d[i]=b;
+ const k=cx+','+cz;(G.w.edits[k]=G.w.edits[k]||{})[i]=b;if(b==15)G.crops.set(x+','+y+','+z,G.t);
+ let t=H-1;const ci=(z&15)*16+(x&15);while(t>0){const q=c.d[(t*16+(z&15))*16+(x&15)];if(q&&q!=15&&q!=18)break;t--}c.top[ci]=t;c.dirty=true;
+ for(const[dx,dz]of[[1,0],[-1,0],[0,1],[0,-1]]){if(((x+dx)>>4)!=cx||((z+dz)>>4)!=cz){const n=G.chunks.get(ck((x+dx)>>4,(z+dz)>>4));if(n)n.dirty=true}}
+ if(!net)send({t:'blk',x,y,z,b})}
+function loadChunk(cx,cz){const c=genChunk(cx,cz),e=G.w.edits[cx+','+cz];if(e)for(const i in e){c.d[i]=e[i];if(e[i]==15)G.crops.set(((cx*16)+(i&15))+','+(i>>8)+','+(cz*16+((i>>4)&15)),G.t)}
+ if(e){for(let i=0;i<256;i++){let y=H-1;while(y>0){const b=c.d[(y*16+(i>>4))*16+(i&15)];if(b&&b!=15&&b!=18)break;y--}c.top[i]=y}}
+ G.chunks.set(ck(cx,cz),c);if(!G.w.visited[cx+','+cz]){G.w.visited[cx+','+cz]=1;for(const s of c.spawns)addEnt('villager',s[0],s[1],s[2])}}
+function meshChunk(c){const o=[],w=[],bx=c.cx*16,bz=c.cz*16,d=c.d;
+ for(let y=0;y<H;y++)for(let z=0;z<16;z++)for(let x=0;x<16;x++){const b=d[(y*16+z)*16+x];if(!b)continue;const Bk=B(b),wx=bx+x,wz=bz+z;
+  for(let f=0;f<6;f++){const F=FACES[f],dd=F.d,nx=wx+dd[0],ny=y+dd[1],nz=wz+dd[2];let nb;
+   if(ny<0)nb=1;else if(ny>=H)nb=0;else if(x+dd[0]>=0&&x+dd[0]<16&&z+dd[2]>=0&&z+dd[2]<16)nb=d[(ny*16+z+dd[2])*16+x+dd[0]];else nb=get(nx,ny,nz);
+   const N=nb?B(nb):null;let show;if(!nb)show=true;else if(Bk.fl)show=N.cut;else show=(N.cut&&nb!==b)||N.fl;if(!show)continue;
+   const l=Bk.emit?2:F.s*(ny>=H||ny>getTop(nx,nz)?1:.4);pushFace(Bk.fl?w:o,F,wx,y,wz,Bk.t[F.k],l)}}
+ for(const[k,a]of[['mo',o],['mw',w]]){if(c[k])gl.deleteBuffer(c[k].b);if(a.length){const bf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);c[k]={b:bf,n:a.length/6}}else c[k]=null}
+ c.dirty=false}
+/* ---------- entities ---------- */
+const hex=h=>[1,3,5].map(o=>parseInt(h.slice(o,o+2),16)/255);
+const MODELS={pig:[[-.35,.3,-.5,.35,.85,.5,'#f4a6b0'],[-.22,.5,.5,.22,.9,.95,'#f9b9c1'],[-.3,0,-.4,-.1,.3,-.2,'#e48f9b'],[.1,0,-.4,.3,.3,-.2,'#e48f9b'],[-.3,0,.2,-.1,.3,.4,'#e48f9b'],[.1,0,.2,.3,.3,.4,'#e48f9b']],
+ zombie:[[-.25,0,-.12,0,.8,.12,'#3b3f8f'],[0,0,-.12,.25,.8,.12,'#3b3f8f'],[-.25,.8,-.15,.25,1.5,.15,'#2fa6a6'],[-.25,1.5,-.25,.25,2,.25,'#6fae4f'],[-.5,1.1,0,-.25,1.5,.7,'#6fae4f'],[.25,1.1,0,.5,1.5,.7,'#6fae4f']],
+ villager:[[-.3,0,-.2,.3,1.5,.2,'#7a5230'],[-.25,1.5,-.25,.25,2,.25,'#d9a679'],[-.05,1.55,.25,.05,1.75,.4,'#c18d62']],
+ peer:[[-.3,0,-.2,.3,1.4,.2,'#3b82f6'],[-.25,1.4,-.25,.25,1.9,.25,'#f0c9a0']]};
+const HP={pig:6,zombie:12,villager:20,peer:99};
+function addEnt(t,x,y,z){G.ents.push({t,x,y,z,vx:0,vy:0,vz:0,yaw:Math.random()*6,hp:HP[t],tm:Math.random()*3,hurt:0,ground:false,cd:0})}
+let eb;function drawBox(bx,e,c){const cs=Math.cos(e.yaw),sn=Math.sin(e.yaw),a=[];const P=(lx,ly,lz)=>[e.x+lx*cs+lz*sn,e.y+ly,e.z-lx*sn+lz*cs];
+ const[x0,y0,z0,x1,y1,z1]=bx;for(const F of FACES){const cc=F.c.map(q=>P(q[0]?x1:x0,q[1]?y1:y0,q[2]?z1:z0));for(const q of QI){const p=cc[q];a.push(p[0],p[1],p[2],.53,.28,F.s)}}
+ gl.bindBuffer(gl.ARRAY_BUFFER,eb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.DYNAMIC_DRAW);attrs();const h=e.hurt>0;gl.uniform4f(U.tint,h?1:c[0],h?.3:c[1],h?.3:c[2],1);gl.drawArrays(gl.TRIANGLES,0,36)}
+const attrs=()=>{for(const n of['ap','at','al']){const[a,s,o]=U[n];gl.vertexAttribPointer(a,s,gl.FLOAT,false,24,o)}};
+/* ---------- physics ---------- */
+const solidAt=b=>b&&!B(b).fl&&!B(b).plant;
+function coll(x,y,z,hw,hh){for(let ix=Math.floor(x-hw);ix<=Math.floor(x+hw);ix++)for(let iy=Math.floor(y);iy<=Math.floor(y+hh);iy++)for(let iz=Math.floor(z-hw);iz<=Math.floor(z+hw);iz++)if(solidAt(get(ix,iy,iz)))return true;return false}
+function move(e,dt,hw,hh){e.hx=false;let n=e.x+e.vx*dt;if(coll(n,e.y,e.z,hw,hh)){e.vx=0;e.hx=true}else e.x=n;n=e.z+e.vz*dt;if(coll(e.x,e.y,n,hw,hh)){e.vz=0;e.hx=true}else e.z=n;
+ n=e.y+e.vy*dt;if(coll(e.x,n,e.z,hw,hh)){if(e.vy<0)e.ground=true;e.vy=0}else{e.y=n;e.ground=false}}
+/* ---------- game state ---------- */
+const keys={};let mv={x:0,z:0},brkHeld=false,plHeld=false,brk=null,cool=0,jumpReq=false,touchMode='ontouchstart'in window,rain=[];
+function newPlayer(){return{x:.5,y:80,z:.5,vx:0,vy:0,vz:0,yaw:0,pitch:0,fly:false,ground:false,hp:20,food:20,fy:0,hurt:0}}
+function findSpawn(){for(let r=0;r<400;r+=6)for(let a=0;a<6.3;a+=.7){const x=Math.round(Math.cos(a)*r),z=Math.round(Math.sin(a)*r),h=hAt(x,z);if(h>SEA+1&&h<50&&biome(x,z)<2)return[x+.5,h+1.2,z+.5]}return[.5,hAt(0,0)+2,.5]}
+async function startWorld(w,temp){if(G)await A.save();
+ w.edits=w.edits||{};w.visited=w.visited||{};w.cust=w.cust||[];w.inv=w.inv||{};w.hot=w.hot||[1,2,3,6,8,9,11,16,13];
+ SEED=w.seed;AMP=w.amp||1;G={w,temp,chunks:new Map(),ents:[],p:w.player||newPlayer(),sel:0,t:w.time||120,weather:0,wt:120,crops:new Map(),netT:0,spT:0,saveT:0,peers:[],net:null};
+ if(!w.player){const s=findSpawn();Object.assign(G.p,{x:s[0],y:s[1],z:s[2]});w.spawn=s}
+ G.p.hp=Math.max(G.p.hp,1);resetBL();await applyPacks();
+ for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++)loadChunk((G.p.x>>4)+dx,(G.p.z>>4)+dz);
+ let tries=0;while(coll(G.p.x,G.p.y,G.p.z,.3,1.8)&&tries++<60)G.p.y+=1;
+ A.resume();rebuildHot();toast(w.mode==='creative'?'Creative: double-tap jump to fly':w.mode==='survival'?'Survival: gather, craft, survive the night':'Adventure: explore and talk to villagers')}
+const mode=()=>G.w.mode;
+const invAdd=(id,n=1)=>{G.w.inv[id]=(G.w.inv[id]||0)+n},invTake=(id,n=1)=>{G.w.inv[id]-=n;if(G.w.inv[id]<=0)delete G.w.inv[id]};
+function rebuildHot(){const h=$('#hot');h.innerHTML=G.w.hot.map((id,i)=>`<div class="${i==G.sel?'s':''}" data-i="${i}" style="background-image:${id?icon(id):'none'}">${mode()==='survival'&&id?`<span>${G.w.inv[id]||0}</span>`:''}</div>`).join('');
+ h.querySelectorAll('div').forEach(d=>d.onpointerdown=ev=>{ev.stopPropagation();G.sel=+d.dataset.i;rebuildHot()})}
+function hurt(n){if(mode()==='creative')return;G.p.hp-=n;G.p.hurt=.3;if(G.p.hp<=0){G.p.hp=20;G.p.food=20;const s=G.w.spawn||[0,90,0];Object.assign(G.p,{x:s[0],y:s[1],z:s[2],vx:0,vy:0,vz:0});toast('You died. Respawned at spawn.')}}
+function ray(maxd=6){const p=G.p,cp=Math.cos(p.pitch),dx=-Math.sin(p.yaw)*cp,dy=Math.sin(p.pitch),dz=-Math.cos(p.yaw)*cp,ex=p.x,ey=p.y+1.62,ez=p.z;let px=-1e9,py=0,pz=0;
+ for(let t=0;t<maxd;t+=.04){const x=Math.floor(ex+dx*t),y=Math.floor(ey+dy*t),z=Math.floor(ez+dz*t);if(x==px&&y==py&&z==pz)continue;const b=get(x,y,z);if(b&&!B(b).fl)return{x,y,z,b,px,py,pz,t};px=x;py=y;pz=z}return null}
+function aimEnt(r){const p=G.p,cp=Math.cos(p.pitch),f=[-Math.sin(p.yaw)*cp,Math.sin(p.pitch),-Math.cos(p.yaw)*cp];let best=null,bd=r;
+ for(const e of G.ents){const dx=e.x-p.x,dy=e.y+.9-(p.y+1.62),dz=e.z-p.z,d=Math.hypot(dx,dy,dz);if(d<bd&&(dx*f[0]+dy*f[1]+dz*f[2])/d>.93){best=e;bd=d}}return best}
+function useItem(){if(cool>0)return;cool=.25;const id=G.w.hot[G.sel],e=aimEnt(3.2);
+ if(e&&e.t==='villager'){const q=[`Welcome to our village, traveler.`,`Trade: 6 Wheat → 1 Lamp.`,`Farmland + Seeds grows Wheat. It ripens in ~90s.`];if(G.w.inv[101]>=6){invTake(101,6);invAdd(16);toast('Villager: Here, a lamp for your wheat!');rebuildHot()}else toast('Villager: '+q[Math.random()*3|0]);return}
+ if((id==102||id==104)&&(G.p.food<20||G.p.hp<20)){if(mode()!=='creative'&&!G.w.inv[id])return;if(mode()!=='creative')invTake(id);G.p.food=Math.min(20,G.p.food+(id==102?8:4));G.p.hp=Math.min(20,G.p.hp+2);rebuildHot();return}
+ if(mode()==='adventure'||!id)return;const r=ray();if(!r)return;
+ if(id==103){if(get(r.x,r.y,r.z)==14&&!get(r.x,r.y+1,r.z)){setBlock(r.x,r.y+1,r.z,15);if(mode()==='survival'){invTake(103);rebuildHot()}}return}
+ if(!BL[id])return;const x=r.px,y=r.py,z=r.pz,ob=get(x,y,z);if(ob&&!B(ob).fl)return;
+ const p=G.p;if(!B(id).plant&&x+1>p.x-.3&&x<p.x+.3&&y+1>p.y&&y<p.y+1.8&&z+1>p.z-.3&&z<p.z+.3)return;
+ if(mode()==='survival'){if(!G.w.inv[id])return;invTake(id);rebuildHot()}
+ if(G.peers.length&&G.net&&!G.net.host&&!G.net.build){toast('Host disabled building');return}setBlock(x,y,z,id)}
+function dropFor(b){const q=Math.random();if(b==3)return[9];if(b==1)return q<.15?[2,103]:[2];if(b==7)return q<.1?[103]:[];if(b==12)return[100];if(b==18)return[101,103];if(b==15)return[103];return[b]}
+function attack(){const e=aimEnt(3.4);if(e&&e.t!=='peer'){e.hp-=mode()==='creative'?20:3;e.hurt=.3;const dx=e.x-G.p.x,dz=e.z-G.p.z,d=Math.hypot(dx,dz)||1;e.vx=dx/d*7;e.vz=dz/d*7;e.vy=5;
+  if(e.hp<=0){G.ents.splice(G.ents.indexOf(e),1);if(mode()!=='creative'){if(e.t==='pig')invAdd(104,1+(Math.random()*2|0));if(e.t==='zombie'&&Math.random()<.4)invAdd(103)}rebuildHot()}return true}return false}
+function breakStep(dt){const m=mode();if(m==='adventure'){brk=null;return}const r=ray();if(!r||B(r.b).h<0){brk=null;return}
+ if(!brk||brk.x!=r.x||brk.y!=r.y||brk.z!=r.z)brk={x:r.x,y:r.y,z:r.z,t:0};brk.t+=dt;const need=m==='creative'?.2:B(r.b).h;
+ if(brk.t>=need){if(m==='survival'){const dr=dropFor(r.b);for(const i of dr)invAdd(i);rebuildHot()}if(G.net&&!G.net.host&&!G.net.build){toast('Host disabled building');brk=null;return}setBlock(r.x,r.y,r.z,0);brk=null}}
+/* ---------- update ---------- */
+function dayF(){const a=(G.t%600)/600*6.2832;return Math.min(1,Math.max(.05,.5+.8*Math.sin(a)))}
+function update(dt){const p=G.p,w=G.w,m=w.mode;G.t+=dt;cool-=dt;
+ if(G.t>G.wt){G.weather=G.weather?0:(Math.random()<.4?1:0);G.wt=G.t+120+Math.random()*200}
+ const sp=Math.cos(p.yaw),ss=Math.sin(p.yaw),inW=B(get(Math.floor(p.x),Math.floor(p.y+.4),Math.floor(p.z))).fl;
+ const gp=navigator.getGamepads?[...navigator.getGamepads()].find(g=>g):null;let ix=mv.x+((keys.KeyD?1:0)-(keys.KeyA?1:0)),iz=mv.z+((keys.KeyS?1:0)-(keys.KeyW?1:0));
+ if(gp){const dz=v=>Math.abs(v)>.2?v:0;ix+=dz(gp.axes[0]);iz+=dz(gp.axes[1]);p.yaw-=dz(gp.axes[2])*dt*3*S.sens;p.pitch=Math.max(-1.5,Math.min(1.5,p.pitch-dz(gp.axes[3])*dt*2.5*S.sens));
+  if(gp.buttons[0]&&gp.buttons[0].pressed)jumpReq=true;brkHeld=brkHeld||(gp.buttons[7]&&gp.buttons[7].pressed);if(gp.buttons[6]&&gp.buttons[6].pressed)useItem();if(gp.buttons[9]&&gp.buttons[9].pressed)A.menuOpen()}
+ if(keys.ArrowLeft)p.yaw+=dt*2;if(keys.ArrowRight)p.yaw-=dt*2;if(keys.ArrowUp)p.pitch=Math.min(1.5,p.pitch+dt*1.6);if(keys.ArrowDown)p.pitch=Math.max(-1.5,p.pitch-dt*1.6);
+ const l=Math.hypot(ix,iz);if(l>1){ix/=l;iz/=l}const spd=p.fly?11:inW?2.6:4.4*(keys.ShiftLeft?1.4:1);
+ p.vx=(ix*sp+iz*ss)*spd;p.vz=(-ix*ss+iz*sp)*spd;
+ if(p.fly){p.vy=((jumpReq||keys.Space)?1:0)*8-(keys.ShiftLeft||keys.KeyX?8:0);if(!jumpReq&&!keys.Space&&!keys.ShiftLeft)p.vy=0}
+ else{p.vy-=(inW?6:28)*dt;if(inW)p.vy=Math.max(p.vy,-3);if((jumpReq||keys.Space)&&(p.ground||inW)){p.vy=inW?4.5:8.6}}
+ jumpReq=false;const wasG=p.ground,vy0=p.vy;move(p,Math.min(dt,.05),.3,1.8);
+ if(!p.ground&&!p.fly&&!inW)p.fy=Math.max(p.fy,p.y);else{if(p.ground&&!wasG&&m==='survival'&&p.fy-p.y>3.6&&!inW)hurt(Math.floor(p.fy-p.y-3));p.fy=p.y}
+ if(p.y<-20){p.y=90;p.vy=0}
+ if(m==='survival'){G.hunT=(G.hunT||0)+dt;if(G.hunT>45){G.hunT=0;if(p.food>0)p.food--;else hurt(1)}G.regT=(G.regT||0)+dt;if(G.regT>3){G.regT=0;if(p.food>=16&&p.hp<20)p.hp++}}
+ p.hurt-=dt;
+ if(brkHeld){if(!G.atk){G.atk=true;if(attack())brk=null}if(!G.atk2)breakStep(dt)}else{brk=null;G.atk=false}
+ if(plHeld&&m!=='creative')plHeld=false;if(plHeld)useItem();
+ /* chunks */
+ const pcx=p.x>>4,pcz=p.z>>4,R=S.rd;let gen=0;
+ const need=[];for(let dz=-R-1;dz<=R+1;dz++)for(let dx=-R-1;dx<=R+1;dx++)if(!G.chunks.has(ck(pcx+dx,pcz+dz)))need.push([dx,dz]);
+ need.sort((a,b)=>a[0]*a[0]+a[1]*a[1]-b[0]*b[0]-b[1]*b[1]);for(const[dx,dz]of need){if(gen++>=2)break;loadChunk(pcx+dx,pcz+dz)}
+ let ms=0;const dl=[];for(const c of G.chunks.values()){const dx=c.cx-pcx,dz=c.cz-pcz;if(Math.abs(dx)>R+3||Math.abs(dz)>R+3){dl.push(c);continue}
+  if(c.dirty&&Math.abs(dx)<=R&&Math.abs(dz)<=R&&ms<3){let ok=true;for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]])if(!G.chunks.has(ck(c.cx+a,c.cz+b)))ok=false;if(ok){meshChunk(c);ms++}}}
+ for(const c of dl){if(c.mo)gl.deleteBuffer(c.mo.b);if(c.mw)gl.deleteBuffer(c.mw.b);G.chunks.delete(ck(c.cx,c.cz))}
+ /* crops */
+ for(const[k,t0]of G.crops){if(G.t-t0>90){const[x,y,z]=k.split(',').map(Number);G.crops.delete(k);if(get(x,y,z)==15)setBlock(x,y,z,18,true)}}
+ /* mobs */
+ G.spT-=dt;if(G.spT<=0){G.spT=3;const night=dayF()<.3,a=Math.random()*6.28,r=18+Math.random()*10,x=Math.floor(p.x+Math.cos(a)*r),z=Math.floor(p.z+Math.sin(a)*r),c=G.chunks.get(ck(x>>4,z>>4));
+  if(c){const y=getTop(x,z)+1,below=get(x,y-1,z),n=t=>G.ents.filter(e=>e.t===t).length;
+   if(below==1&&n('pig')<8&&Math.random()<.5)addEnt('pig',x+.5,y,z+.5);
+   else if(m!=='creative'&&w.diff>0&&night&&n('zombie')<6&&!B(below).fl)addEnt('zombie',x+.5,y,z+.5)}}
+ for(let i=G.ents.length-1;i>=0;i--){const e=G.ents[i];if(e.t==='peer')continue;const dx=p.x-e.x,dz=p.z-e.z,d=Math.hypot(dx,dz);
+  if(d>70||(e.t==='zombie'&&(dayF()>.55||w.diff==0)&&Math.random()<.01)){G.ents.splice(i,1);continue}
+  e.tm-=dt;e.hurt-=dt;e.cd-=dt;let sp2=0;
+  if(e.t==='zombie'&&d<22){e.yaw=Math.atan2(dx,dz);sp2=2.4;if(d<1.3&&e.cd<=0){e.cd=1;hurt(w.diff*1.5+.5|0||1);p.vx+=dx/d*3}}
+  else{if(e.tm<=0){e.tm=1+Math.random()*3;e.yaw+=Math.random()*3-1.5;e.go=Math.random()<.6}sp2=e.go&&e.t!=='villager'?1.1:0}
+  if(e.hurt<=0||e.ground){if(e.hurt<=0){e.vx=Math.sin(e.yaw)*sp2;e.vz=Math.cos(e.yaw)*sp2}}
+  const inw=B(get(Math.floor(e.x),Math.floor(e.y+.3),Math.floor(e.z))).fl;e.vy-=(inw?5:28)*dt;if(inw)e.vy=Math.max(e.vy,-2)+.8;
+  move(e,dt,.3,e.t==='zombie'?1.9:1);if(e.hx&&e.ground&&sp2)e.vy=8;if(e.y<-10)G.ents.splice(i,1)}
+ if(G.net){G.netT-=dt;if(G.netT<=0){G.netT=.1;send({t:'pos',id:G.net.id,x:p.x,y:p.y,z:p.z,yaw:p.yaw})}}
+ G.saveT+=dt;if(G.saveT>30){G.saveT=0;A.save()}}
+/* ---------- render ---------- */
+function resize(){const dp=Math.min(devicePixelRatio||1,2)*S.sc,W=Math.floor(innerWidth*dp),Hh=Math.floor(innerHeight*dp);if(cv.width!=W||cv.height!=Hh){cv.width=W;cv.height=Hh}if(hudc.width!=innerWidth||hudc.height!=innerHeight){hudc.width=innerWidth;hudc.height=innerHeight}}
+function render(){resize();const p=G.p,day=dayF(),rainy=G.weather&&true,k=rainy?.6:1,sky=[(.02+.5*day)*k,(.03+.72*day)*k,(.08+.9*day)*k];
+ gl.viewport(0,0,cv.width,cv.height);gl.clearColor(sky[0],sky[1],sky[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ const inW=B(get(Math.floor(p.x),Math.floor(p.y+1.62),Math.floor(p.z))).fl,fogd=inW?14:(S.rd*16+8)*(rainy?.7:1);
+ const V=mul(rotX(-p.pitch),mul(rotY(-p.yaw),trans(-p.x,-p.y-1.62,-p.z))),M=mul(persp(S.fov*Math.PI/180,cv.width/cv.height,.1,500),V);
+ gl.uniformMatrix4fv(U.m,false,M);gl.uniform1i(U.s,0);gl.uniform1f(U.day,day);gl.uniform1f(U.fogd,fogd);gl.uniform3f(U.fc,sky[0],sky[1],sky[2]);gl.uniform4f(U.tint,1,1,1,1);
+ const fx=-Math.sin(p.yaw),fz=-Math.cos(p.yaw),vis=[];
+ for(const c of G.chunks.values()){if(!c.mo&&!c.mw)continue;const dx=c.cx*16+8-p.x,dz=c.cz*16+8-p.z;if(dx*fx+dz*fz<-20)continue;vis.push(c)}
+ gl.disable(gl.BLEND);for(const c of vis)if(c.mo){gl.bindBuffer(gl.ARRAY_BUFFER,c.mo.b);attrs();gl.drawArrays(gl.TRIANGLES,0,c.mo.n)}
+ eb=eb||gl.createBuffer();for(const e of G.ents){const md=MODELS[e.t];if(!md)continue;for(const b of md)drawBox(b,e,hex(b[6]))}
+ gl.enable(gl.BLEND);gl.uniform4f(U.tint,.8,.9,1,.62);gl.depthMask(false);for(const c of vis)if(c.mw){gl.bindBuffer(gl.ARRAY_BUFFER,c.mw.b);attrs();gl.drawArrays(gl.TRIANGLES,0,c.mw.n)}gl.depthMask(true);
+ hud(day,V)}
+function hud(day){const W=hudc.width,Hh=hudc.height;hx.clearRect(0,0,W,Hh);const p=G.p;
+ const a=(G.t%600)/600*6.2832;for(const[ph,col,r]of[[0,'#ffe9a0',16],[Math.PI,'#dfe6ff',11]]){const s=Math.sin(a+ph);if(s>-.1){hx.fillStyle=col;hx.beginPath();hx.arc(W*(.5+.42*Math.cos(a+ph)),Hh*(.45-.4*s),r,0,7);hx.fill()}}
+ hx.strokeStyle='#fffc';hx.lineWidth=2;hx.beginPath();hx.moveTo(W/2-9,Hh/2);hx.lineTo(W/2+9,Hh/2);hx.moveTo(W/2,Hh/2-9);hx.lineTo(W/2,Hh/2+9);hx.stroke();
+ if(brk&&mode()==='survival'){const n=Math.min(1,brk.t/Math.max(.1,B(get(brk.x,brk.y,brk.z)).h));hx.fillStyle='#ffb23e';hx.fillRect(W/2-20,Hh/2+16,40*n,4)}
+ if(G.weather&&getTop(Math.floor(p.x),Math.floor(p.z))<=p.y+1){if(!rain.length)for(let i=0;i<140;i++)rain.push([Math.random()*W,Math.random()*Hh]);hx.strokeStyle='#cfe3ffaa';hx.lineWidth=1;hx.beginPath();for(const r of rain){r[1]+=22;r[0]-=4;if(r[1]>Hh){r[1]=-20;r[0]=Math.random()*W+40}hx.moveTo(r[0],r[1]);hx.lineTo(r[0]+3,r[1]-16)}hx.stroke()}
+ if(p.hurt>0){hx.fillStyle='rgba(220,30,30,'+p.hurt+')';hx.fillRect(0,0,W,Hh)}
+ const m=mode()==='creative';$('#hp').style.width=p.hp*5+'%';$('#fd').style.width=p.food*5+'%';$('#stats').style.display=m?'none':'flex';
+ $('#info').textContent=(S.coords?`XYZ ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)} · `:'')+`${G.w.name} · ${G.weather?'Rain':'Clear'} · ${dayF()>.5?'Day':'Night'}`+(G.net?' · '+(G.peers.filter(x=>x.dc&&x.dc.readyState==='open').length)+' online':'')}
+let last=0;function frame(ts){requestAnimationFrame(frame);if(!G||paused||!gl)return;const dt=Math.min(.05,(ts-last)/1000);last=ts;update(dt);render()}requestAnimationFrame(frame);
+/* ---------- input ---------- */
+const lookTouch=new Map();let joy=null;
+cv.addEventListener('touchstart',e=>{e.preventDefault();for(const t of e.changedTouches){if(t.clientX<innerWidth*.4&&!joy){joy={id:t.identifier,x:t.clientX,y:t.clientY};const j=$('#joy');j.style.display='block';j.style.left=t.clientX-55+'px';j.style.top=t.clientY-55+'px'}else lookTouch.set(t.identifier,{x:t.clientX,y:t.clientY})}},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(!G)return;for(const t of e.changedTouches){if(joy&&t.identifier===joy.id){const dx=(t.clientX-joy.x)/45,dy=(t.clientY-joy.y)/45,l=Math.hypot(dx,dy)||1,k=Math.min(1,l)/l;mv.x=dx*k;mv.z=dy*k;$('#joy i').style.transform=`translate(${dx*k*30}px,${dy*k*30}px)`}
+ else{const o=lookTouch.get(t.identifier);if(o){G.p.yaw-=(t.clientX-o.x)*.006*S.sens;G.p.pitch=Math.max(-1.5,Math.min(1.5,G.p.pitch-(t.clientY-o.y)*.006*S.sens));o.x=t.clientX;o.y=t.clientY}}}},{passive:false});
+const tend=e=>{for(const t of e.changedTouches){if(joy&&t.identifier===joy.id){joy=null;mv={x:0,z:0};$('#joy').style.display='none';$('#joy i').style.transform=''}lookTouch.delete(t.identifier)}};cv.addEventListener('touchend',tend);cv.addEventListener('touchcancel',tend);
+const hold=(id,on,off)=>{const b=$(id);const d=e=>{e.preventDefault();e.stopPropagation();on()},u=e=>{e.preventDefault();off&&off()};b.addEventListener('touchstart',d,{passive:false});b.addEventListener('touchend',u);b.addEventListener('mousedown',d);b.addEventListener('mouseup',u)};
+let lastJ=0;const jumpTap=()=>{jumpReq=true;const n=performance.now();if(n-lastJ<300&&mode()==='creative'){G.p.fly=!G.p.fly;G.p.vy=0}lastJ=n};
+hold('#bJ',jumpTap);hold('#bB',()=>{brkHeld=true},()=>{brkHeld=false});hold('#bP',()=>{useItem()});hold('#bF',()=>{if(mode()==='creative')G.p.fly=!G.p.fly});hold('#bI',()=>A.inv());hold('#bM',()=>A.menuOpen());
+addEventListener('keydown',e=>{if(!G||paused)return;if(e.code==='Space'&&!keys.Space)jumpTap();keys[e.code]=true;if(e.code==='KeyE')A.inv();if(e.code==='KeyF'&&mode()==='creative')G.p.fly=!G.p.fly;if(e.code==='Escape')A.menuOpen();
+ if(e.code==='Enter')useItem();if(e.code==='Backspace')brkHeld=true;if(/^Digit[1-9]$/.test(e.code)){G.sel=+e.code.slice(5)-1;rebuildHot()}});
+addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Backspace')brkHeld=false});
+cv.addEventListener('click',()=>{if(G&&!paused&&!touchMode&&cv.requestPointerLock)cv.requestPointerLock()});
+addEventListener('mousemove',e=>{if(G&&!paused&&document.pointerLockElement===cv){G.p.yaw-=e.movementX*.0025*S.sens;G.p.pitch=Math.max(-1.5,Math.min(1.5,G.p.pitch-e.movementY*.0025*S.sens))}});
+cv.addEventListener('mousedown',e=>{if(!G||paused||touchMode)return;if(e.button===0)brkHeld=true;if(e.button===2){plHeld=true;useItem()}});addEventListener('mouseup',e=>{if(e.button===0)brkHeld=false;if(e.button===2)plHeld=false});
+cv.addEventListener('contextmenu',e=>e.preventDefault());cv.addEventListener('wheel',e=>{if(G&&!paused){G.sel=(G.sel+(e.deltaY>0?1:8))%9;rebuildHot()}});
+document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement&&G&&!paused&&!$('#inv').style.display.includes('block'))A.menuOpen()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&G)A.save()});
+/* ---------- multiplayer (WebRTC, manual code exchange, works offline on one Wi-Fi/hotspot) ---------- */
+function send(m,except){if(!G||!G.peers)return;const s=JSON.stringify(m);for(const p of G.peers)if(p!==except&&p.dc&&p.dc.readyState==='open')p.dc.send(s)}
+const mkPC=()=>new RTCPeerConnection({iceServers:[]});
+const waitIce=async pc=>{if(pc.iceGatheringState==='complete')return;await new Promise(r=>{pc.addEventListener('icegatheringstatechange',()=>pc.iceGatheringState==='complete'&&r());setTimeout(r,4000)})};
+function setupDC(peer){const dc=peer.dc;dc.onopen=()=>{if(G.net.host){const w=G.w;dc.send(JSON.stringify({t:'hello',seed:w.seed,amp:w.amp,mode:w.mode==='creative'?'creative':w.mode,time:G.t,build:G.net.build,cust:w.cust,name:w.name,id:peer.pid}));for(const k in w.edits)dc.send(JSON.stringify({t:'edits',k,e:w.edits[k]}));toast('Player joined')}};
+ dc.onmessage=async ev=>{const m=JSON.parse(ev.data);
+  if(m.t==='hello'&&!G.net.host){const w={id:'mp',name:'Joined: '+m.name,seed:m.seed,amp:m.amp,mode:m.mode,diff:0,edits:{},cust:m.cust||[],inv:{},visited:{}};G.net.pending=w;G.net.id=m.id;G.net.build=m.build;
+   const old=G.peers,oldNet=G.net;await startWorld(w,true);G.peers=old;G.net=oldNet;toast('Connected to host')}
+  else if(m.t==='edits'&&!G.net.host){G.w.edits[m.k]=Object.assign(G.w.edits[m.k]||{},m.e);for(const i in m.e){const[cx,cz]=m.k.split(',').map(Number),c=G.chunks.get(ck(cx,cz));if(c){c.d[i]=m.e[i];c.dirty=true}}}
+  else if(m.t==='blk'){if(G.net.host&&!G.net.build&&peer.pid!==0){return}setBlock(m.x,m.y,m.z,m.b,true);if(G.net.host)send(m,peer)}
+  else if(m.t==='pos'){let e=G.ents.find(x=>x.t==='peer'&&x.pid===m.id);if(!e){addEnt('peer',m.x,m.y,m.z);e=G.ents[G.ents.length-1];e.pid=m.id}e.x=m.x;e.y=m.y;e.z=m.z;e.yaw=m.yaw+Math.PI;e.vx=e.vy=e.vz=0;e.tm=99;e.ts=G.t;if(G.net.host)send(m,peer)}};
+ dc.onclose=()=>toast('A player left')}
+const NET={async host(){if(!G)throw Error('Start a world first');G.net=G.net||{host:true,build:G.w.guestBuild!==false,id:0};const peer={pid:G.peers.length+1,pc:mkPC()};peer.dc=peer.pc.createDataChannel('g');setupDC(peer);G.peers.push(peer);peer.pc.setLocalDescription(await peer.pc.createOffer());await waitIce(peer.pc);return btoa(JSON.stringify(peer.pc.localDescription))},
+ async accept(code){const p=G.peers[G.peers.length-1];await p.pc.setRemoteDescription(JSON.parse(atob(code.trim())))},
+ async join(code){const peer={pid:0,pc:mkPC()};if(!G||!G.peers)G={w:{id:'mp',name:'Joining',seed:1,mode:'creative',diff:0,edits:{},visited:{},cust:[],inv:{},hot:[]},temp:true,chunks:new Map(),ents:[],p:newPlayer(),crops:new Map(),t:0,spT:0,saveT:0,netT:0,sel:0,weather:0,wt:1e9};G.peers=[peer];G.net={host:false,build:true,id:uid()};peer.pc.ondatachannel=e=>{peer.dc=e.channel;setupDC(peer)};
+  await peer.pc.setRemoteDescription(JSON.parse(atob(code.trim())));await peer.pc.setLocalDescription(await peer.pc.createAnswer());await waitIce(peer.pc);return btoa(JSON.stringify(peer.pc.localDescription))}};
+/* ---------- import / export ---------- */
+async function importArchive(file,out){const u=new Uint8Array(await file.arrayBuffer()),z=await readZip(u),dec=new TextDecoder();
+ if(z.has('blockforge_world.json')){const w=JSON.parse(dec.decode(await z.get('blockforge_world.json')()));w.id=uid();w.modified=Date.now();await dbPut('worlds',w);out.push('World "'+w.name+'"')}
+ else if(z.has('levelname.txt')||z.has('level.dat')){const nm=z.has('levelname.txt')?dec.decode(await z.get('levelname.txt')()).trim():file.name.replace(/\.\w+$/,'');
+  await dbPut('worlds',newWorld({name:nm+' (Bedrock import)'}));out.push('Bedrock world "'+nm+'" → new world (terrain format is not convertible; bundled packs imported)')}
+ for(const n of z.keys())if(/\.(mcpack|mcaddon|mcworld|zip)$/i.test(n))await importArchive(new File([await z.get(n)()],n),out);
+ for(const n of z.keys()){if(!/(^|\/)manifest\.json$/.test(n))continue;const dir=n.slice(0,n.length-13);let mf;try{mf=pjson(dec.decode(await z.get(n)()))}catch(e){continue}
+  const types=(mf.modules||[]).map(m=>m.type),kind=types.includes('resources')?'resource':types.includes('data')?'behavior':null;if(!kind)continue;
+  const id=(mf.header&&mf.header.uuid)||uid(),p={id,name:(mf.header&&mf.header.name)||dir||file.name,kind,active:false,order:packs.length,desc:(mf.header&&mf.header.description)||'',tiles:{},tex:{},blocks:[],files:{}};
+  for(const f of z.keys()){if(!f.startsWith(dir)||f===n&&false)continue;const rel=f.slice(dir.length);let m;
+   if(f.startsWith(dir)&&rel&&!rel.includes('..')&&(p.files[rel]=null,true)){}
+   if(kind==='resource'&&(m=rel.match(/^textures\/blocks?\/([^\/]+)\.png$/i))){const d=await z.get(f)();p.tex[m[1].toLowerCase()]='data:image/png;base64,'+b64(d);p.files[rel]=d}
+   else if(kind==='behavior'&&/^blocks\/.*\.json$/i.test(rel)){const d=await z.get(f)();p.files[rel]=d;try{const j=pjson(dec.decode(d)),bk=j['minecraft:block'];if(bk){const cm=bk.components||{},idn=bk.description.identifier,mc=cm['minecraft:map_color'],ds=cm['minecraft:destructible_by_mining'];
+     p.blocks.push({id:idn,name:idn.split(':').pop().replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),color:typeof mc==='string'&&/^#[0-9a-f]{6}$/i.test(mc)?mc:'#'+((hash2(strSeed(idn),1,2)*16777215|0)|0x404040).toString(16).padStart(6,'0').slice(0,6),emit:(cm['minecraft:light_emission']||cm['minecraft:block_light_emission']||0)>0,hard:ds&&ds.seconds_to_destroy!=null?ds.seconds_to_destroy:undefined})}}catch(e){}}
+   else if(rel&&p.files[rel]===null){p.files[rel]=await z.get(f)()}}
+  for(const k in p.files)if(p.files[k]===null)delete p.files[k];
+  const ex=packs.findIndex(q=>q.id===id);if(ex>=0)packs.splice(ex,1);packs.push(p);await dbPut('packs',p);out.push((kind==='resource'?'Texture/resource pack "':'Behavior pack "')+p.name+'" ('+(kind==='resource'?Object.keys(p.tex).length+' block textures':p.blocks.length+' blocks')+')')}}
+function newWorld(o){return Object.assign({id:uid(),name:'My World',seed:Math.random()*2e9|0,mode:'creative',diff:2,amp:1,guestBuild:true,created:Date.now(),modified:Date.now(),edits:{},visited:{},cust:[],inv:{},hot:[1,2,3,6,8,9,11,16,13],time:120},o)}
+async function exportPack(p){const files={};const enc=new TextEncoder();
+ if(p.files&&Object.keys(p.files).length){Object.assign(files,p.files);if(!files['manifest.json'])files['manifest.json']=enc.encode(JSON.stringify(mfFor(p)))}
+ else{files['manifest.json']=enc.encode(JSON.stringify(mfFor(p)));
+  for(const i in p.tiles){const r=await fetch(p.tiles[i]);files['textures/blocks/'+(AL[i]?AL[i][0]:'tile_'+i)+'.png']=new Uint8Array(await r.arrayBuffer())}
+  for(const n in p.tex||{}){const r=await fetch(p.tex[n]);files['textures/blocks/'+n+'.png']=new Uint8Array(await r.arrayBuffer())}
+  for(const b of p.blocks||[])files['blocks/'+b.id.split(':').pop()+'.json']=enc.encode(JSON.stringify({format_version:'1.20.10','minecraft:block':{description:{identifier:b.id},components:{'minecraft:light_emission':b.emit?15:0,'minecraft:map_color':b.color,'minecraft:destructible_by_mining':{seconds_to_destroy:b.hard!=null?b.hard:1.5}}}}))}
+ await saveFile(p.name.replace(/\W+/g,'_')+(p.kind==='resource'?'.mcpack':'.mcaddon'),makeZip(files))}
+const mfFor=p=>({format_version:2,header:{name:p.name,description:p.desc||'Made with BlockForge',uuid:/^[0-9a-f-]{36}$/.test(p.id)?p.id:crypto.randomUUID(),version:[1,0,0],min_engine_version:[1,20,0]},modules:[{type:p.kind==='resource'?'resources':'data',uuid:crypto.randomUUID(),version:[1,0,0]}]});
+/* ---------- built-in library ---------- */
+const LIB=[{id:'lib.neon',kind:'behavior',name:'Neon Blocks',desc:'Three glowing blocks for night builds.',blocks:[{id:'bf:neon_pink',name:'Neon Pink',color:'#ff2d95',emit:true},{id:'bf:neon_cyan',name:'Neon Cyan',color:'#18e6ff',emit:true},{id:'bf:neon_lime',name:'Neon Lime',color:'#9dff2e',emit:true}]},
+ {id:'lib.build',kind:'behavior',name:'Builder Set',desc:'Red brick, marble, slate and hay blocks.',blocks:[{id:'bf:red_brick',name:'Red Brick',color:'#a8432f'},{id:'bf:marble',name:'Marble',color:'#e8e6e1'},{id:'bf:slate',name:'Slate',color:'#4a5560'},{id:'bf:hay',name:'Hay Bale',color:'#d6b73c'}]},
+ {id:'lib.pastel',kind:'resource',name:'Pastel Textures',desc:'Soft, light colour palette for every block.',mul:[1.1,1.0,1.2]},{id:'lib.sharp',kind:'resource',name:'High Contrast Textures',desc:'Deeper colours that stay readable on small screens.',mul:[.85,.95,.85]}];
+async function installLib(l){const p={id:l.id,name:l.name,kind:l.kind,desc:l.desc,active:false,order:packs.length,tiles:{},tex:{},blocks:l.blocks||[],files:{}};
+ if(l.mul)for(let i=0;i<23;i++){const c=procTile(i,l.mul);p.tiles[i]=c.toDataURL()}
+ const ex=packs.findIndex(q=>q.id===p.id);if(ex>=0)packs.splice(ex,1);packs.push(p);await dbPut('packs',p)}
+/* ---------- actions & menu ---------- */
+const A={resume(){paused=false;$('#menu').style.display='none';$('#inv').style.display='none';$('#hot').style.display='flex';$('#info').style.display='block';$('#touch').style.display=touchMode?'block':'none';last=performance.now()},
+ menuOpen(){paused=true;if(document.exitPointerLock)document.exitPointerLock();A.save();menu()},
+ async save(){if(!G||G.temp)return;const w=G.w;w.player=G.p;w.time=G.t;w.modified=Date.now();await dbPut('worlds',w)},
+ async quit(){await A.save();G=null;paused=true;$('#hot').style.display=$('#stats').style.display=$('#touch').style.display='none';$('#info').style.display='none';menu('play')},
+ async play(id){const w=(await dbAll('worlds')).find(x=>x.id===id);if(w)startWorld(w)},
+ async create(){const w=newWorld({name:$('#nn').value||'World',seed:strSeed($('#ns').value||Math.random()*2e9|0),mode:$('#nm').value,diff:+$('#nd').value,amp:+$('#na').value,guestBuild:$('#ng').checked});await dbPut('worlds',w);startWorld(w)},
+ async rename(id){const w=(await dbAll('worlds')).find(x=>x.id===id),n=prompt('New name',w.name);if(n){w.name=n;await dbPut('worlds',w);menu()}},
+ async dup(id){const w=(await dbAll('worlds')).find(x=>x.id===id),c=structuredClone(w);c.id=uid();c.name=w.name+' copy';c.modified=Date.now();await dbPut('worlds',c);menu()},
+ async del(id){if(confirm('Delete this world and its backups permanently?')){await dbDel('worlds',id);for(const b of await dbAll('backups'))if(b.wid===id)await dbDel('backups',b.id);menu()}},
+ async backup(id){const w=(G&&G.w.id===id?G.w:(await dbAll('worlds')).find(x=>x.id===id));await A.save();await dbPut('backups',{id:uid(),wid:id,time:Date.now(),data:structuredClone(w)});toast('Backup saved');menu()},
+ async restore(bid){const b=(await dbAll('backups')).find(x=>x.id===bid);if(b&&confirm('Replace the current world with this backup?')){if(G&&G.w.id===b.wid)G=null;const w=structuredClone(b.data);w.modified=Date.now();await dbPut('worlds',w);menu()}},
+ async delBackup(bid){await dbDel('backups',bid);menu()},
+ async exp(id){const w=(G&&G.w.id===id?(await A.save(),G.w):(await dbAll('worlds')).find(x=>x.id===id)),e=new TextEncoder();await saveFile(w.name.replace(/\W+/g,'_')+'.mcworld',makeZip({'blockforge_world.json':e.encode(JSON.stringify(w)),'levelname.txt':e.encode(w.name),'world_icon.txt':e.encode('BlockForge')}))},
+ async imp(files){const out=[];for(const f of files){try{await importArchive(f,out)}catch(e){out.push('✖ '+f.name+': '+e.message)}}alert(out.join('\n')||'Nothing importable found');menu()},
+ async togglePack(id){const p=packs.find(x=>x.id===id);p.active=!p.active;await dbPut('packs',p);await applyPacks();menu()},
+ async movePack(id,d){const l=packs.filter(x=>x.kind===packs.find(y=>y.id===id).kind).sort((a,b)=>a.order-b.order),i=l.findIndex(x=>x.id===id),j=i+d;if(j<0||j>=l.length)return;[l[i].order,l[j].order]=[l[j].order,l[i].order];await dbPut('packs',l[i]);await dbPut('packs',l[j]);await applyPacks();menu()},
+ async delPack(id){if(!confirm('Remove this pack?'))return;packs=packs.filter(x=>x.id!==id);await dbDel('packs',id);await applyPacks();menu()},
+ async renamePack(id){const p=packs.find(x=>x.id===id),n=prompt('Pack name',p.name);if(n){p.name=n;await dbPut('packs',p);menu()}},
+ async newPack(kind){const n=prompt('Name for the new '+kind+' pack','My '+kind+' pack');if(!n)return;const p={id:uid(),name:n,kind,active:false,order:packs.length,desc:'',tiles:{},tex:{},blocks:[],files:{}};packs.push(p);await dbPut('packs',p);menu()},
+ async addBlock(id){const p=packs.find(x=>x.id===id),n=prompt('Block name');if(!n)return;const c=prompt('Colour (hex, e.g. #3366ff)','#3366ff');if(!/^#[0-9a-f]{6}$/i.test(c||''))return alert('Use a 6-digit hex colour like #3366ff');p.blocks.push({id:'custom:'+n.toLowerCase().replace(/\W+/g,'_'),name:n,color:c,emit:confirm('Should it glow (emit light)?')});p.files={};await dbPut('packs',p);await applyPacks();menu()},
+ async tileUpload(id,i,f){const p=packs.find(x=>x.id===id);if(!f)return;const r=new FileReader();r.onload=async()=>{p.tiles[i]=r.result;p.files={};await dbPut('packs',p);if(p.active)await applyPacks();menu()};r.readAsDataURL(f)},
+ async editPack(id){const p=packs.find(x=>x.id===id);$('#mbody').innerHTML=`<div class=card><h3>${esc(p.name)} — tiles</h3><small>Upload a PNG for any block face. Square images work best.</small><br>`+Object.entries({0:'Grass top',1:'Grass side',2:'Dirt',3:'Stone',4:'Sand',5:'Water',6:'Log top',7:'Log side',8:'Leaves',9:'Planks',10:'Cobblestone',11:'Snow',12:'Glass',13:'Coal ore',14:'Table top',15:'Table side',16:'Farmland',17:'Wheat',18:'Lamp',19:'Bedrock'}).map(([i,n])=>`<label class=btn>${n}${p.tiles[i]?' ✓':''}<input type=file hidden accept="image/png" onchange="A.tileUpload('${id}',${i},this.files[0])"></label>`).join('')+`<br><button onclick="menu('packs')">Done</button></div>`},
+ async installLib(id){await installLib(LIB.find(l=>l.id===id));toast('Installed. Activate it in Packs.');menu()},
+ inv(){const el=$('#inv');if(el.style.display==='block'){el.style.display='none';return}const m=mode()==='creative',ids=m?[...Object.keys(BL).map(Number).filter(i=>i!=5&&i!=17),...Object.keys(IT).map(Number)]:Object.keys(G.w.inv).map(Number);
+  el.innerHTML=`<b>${m?'Creative inventory':'Inventory'}</b> <small>tap an item to put it in the selected hotbar slot</small> <button style="float:right" onclick="A.inv()">✕</button><div>`+ids.map(i=>`<div class=slot title="${esc(nameOf(i))}" style="background-image:${icon(i)}" onclick="A.pick(${i})">${m?'':`<span>${G.w.inv[i]}</span>`}</div>`).join('')+`</div><hr><b>Crafting</b><div>`+
+  RECIPES.map((r,k)=>{const ok=m||r.i.every(([id,n])=>(G.w.inv[id]||0)>=n);return`<button ${ok?'':'style="opacity:.45"'} onclick="A.craft(${k})">${r.n}: ${r.i.map(([id,n])=>n+'× '+nameOf(id)).join(' + ')} → ${r.o[1]}× ${nameOf(r.o[0])}</button>`}).join('')+`</div>`;el.style.display='block'},
+ pick(i){G.w.hot[G.sel]=i;if(mode()==='creative'&&!BL[i]&&!IT[i])return;rebuildHot()},
+ craft(k){const r=RECIPES[k];if(mode()!=='creative'){if(!r.i.every(([id,n])=>(G.w.inv[id]||0)>=n))return toast('Missing ingredients');r.i.forEach(([id,n])=>invTake(id,n))}invAdd(r.o[0],r.o[1]);rebuildHot();A.inv();A.inv()},
+ async hostCode(){try{$('#hc').value=await NET.host()}catch(e){alert(e.message)}},async accept(){try{await NET.accept($('#ac').value);toast('Linking… the guest should connect now')}catch(e){alert('Invalid code')}},
+ async joinCode(){try{$('#jc2').value=await NET.join($('#jc').value)}catch(e){alert('Invalid code: '+e.message)}},
+ set(k,v){S[k]=+v;saveS()}};
+let tab='play';const V={};
+async function menu(t){if(t)tab=t;$('#menu').style.display='flex';paused=true;$('#hot').style.display='none';
+ $('#tabs').innerHTML=['play','packs','library','multi','settings'].map(x=>`<b class="${x==tab?'on':''}" onclick="menu('${x}')">${{play:'Worlds',packs:'Packs',library:'Library',multi:'Multiplayer',settings:'Settings'}[x]}</b>`).join('')+(G?'<b onclick="A.resume()">Back to game</b>':'');
+ $('#mbody').innerHTML=await V[tab]()}
+V.play=async()=>{const ws=(await dbAll('worlds')).sort((a,b)=>b.modified-a.modified),bk=await dbAll('backups');
+ return(G?`<div class=card><b>${esc(G.w.name)}</b> is running <button onclick="A.resume()">Resume</button><button onclick="A.save().then(()=>toast('Saved'))">Save</button><button onclick="A.quit()">Quit to menu</button></div>`:'')+
+ `<div class=card><h3>New world</h3><input id=nn value="My World"><input id=ns placeholder="Seed (blank = random)"><br><select id=nm><option value=creative>Creative<option value=survival>Survival<option value=adventure>Adventure</select><select id=nd><option value=0>Peaceful<option value=1>Easy<option value=2 selected>Normal<option value=3>Hard</select><br><label>Terrain height <input id=na type=range min=.5 max=2 step=.1 value=1></label><br><label><input id=ng type=checkbox checked> Guests can build</label><br><button onclick="A.create()">Create &amp; play</button><label class=btn>Import world / pack<input type=file hidden multiple accept=".mcworld,.mcpack,.mcaddon,.zip" onchange="A.imp(this.files)"></label></div>`+
+ ws.map(w=>`<div class=card><b>${esc(w.name)}</b> <small>${w.mode}, difficulty ${w.diff}, seed ${w.seed}, ${new Date(w.modified).toLocaleString()}</small><br><button onclick="A.play('${w.id}')">Play</button><button onclick="A.rename('${w.id}')">Rename</button><button onclick="A.dup('${w.id}')">Duplicate</button><button onclick="A.backup('${w.id}')">Backup</button><button onclick="A.exp('${w.id}')">Export</button><button onclick="A.del('${w.id}')">Delete</button>${bk.filter(b=>b.wid===w.id).sort((a,b)=>b.time-a.time).map(b=>`<div><small>Backup ${new Date(b.time).toLocaleString()}</small> <button onclick="A.restore('${b.id}')">Restore</button><button onclick="A.delBackup('${b.id}')">✕</button></div>`).join('')}</div>`).join('')||'<small>No worlds yet.</small>'}
+V.packs=async()=>{const row=p=>`<div class=card><b>${esc(p.name)}</b> <small>${p.kind==='resource'?'Texture / resource pack':'Behavior pack'}${p.blocks&&p.blocks.length?', '+p.blocks.length+' blocks':''}${p.active?' · ACTIVE':''}</small><br><button onclick="A.togglePack('${p.id}')">${p.active?'Deactivate':'Activate'}</button><button onclick="A.movePack('${p.id}',-1)">↑</button><button onclick="A.movePack('${p.id}',1)">↓</button><button onclick="A.renamePack('${p.id}')">Rename</button>${p.kind==='resource'?`<button onclick="A.editPack('${p.id}')">Edit textures</button>`:`<button onclick="A.addBlock('${p.id}')">Add block</button>`}<button onclick="exportPack(packs.find(x=>x.id==='${p.id}'))">Export</button><button onclick="A.delPack('${p.id}')">Remove</button></div>`;
+ return`<div class=card><label class=btn>Import .mcpack / .mcaddon / .zip<input type=file hidden multiple accept=".mcpack,.mcaddon,.zip,.mcworld" onchange="A.imp(this.files)"></label><button onclick="A.newPack('resource')">New texture pack</button><button onclick="A.newPack('behavior')">New behavior pack</button><br><small>Active packs stack: later ones in the list override earlier ones. Behavior-pack blocks appear in the creative inventory.</small></div>`+packs.slice().sort((a,b)=>a.order-b.order).map(row).join('')||'<small>No packs installed. Import one or open the Library.</small>'}
+V.library=async()=>`<small>Offline add-on library: installed locally, nothing is downloaded.</small>`+LIB.map(l=>`<div class=card><b>${l.name}</b> <small>${l.kind==='resource'?'Texture pack':'Behavior pack'}</small><br>${l.desc}<br><button onclick="A.installLib('${l.id}')">${packs.some(p=>p.id===l.id)?'Reinstall':'Install'}</button></div>`).join('');
+V.multi=async()=>`<div class=card><h3>Play together on the same Wi-Fi or hotspot</h3><small>No internet needed. Host and guest exchange two codes once (message them, or read them aloud / scan a photo). Each extra player repeats the steps.</small></div>
+ <div class=card><b>Host</b> (start a world first)<br><button onclick="A.hostCode()">1. Create invite code</button><textarea id=hc readonly placeholder="Invite code appears here"></textarea><small>Send it to the guest, then paste their reply:</small><textarea id=ac placeholder="Guest reply code"></textarea><button onclick="A.accept()">2. Connect guest</button></div>
+ <div class=card><b>Guest</b><br><textarea id=jc placeholder="Paste host invite code"></textarea><button onclick="A.joinCode()">Create reply code</button><textarea id=jc2 readonly placeholder="Reply code appears here — send it to the host"></textarea><button onclick="A.resume()">Back to game</button></div>`;
+V.settings=async()=>{const r=(k,l,a,b,s)=>`<div><label>${l} <input type=range min=${a} max=${b} step=${s} value=${S[k]} oninput="A.set('${k}',this.value);this.nextElementSibling.textContent=this.value"><b>${S[k]}</b></label></div>`;
+ return`<div class=card>${r('rd','Render distance (chunks)',2,10,1)}${r('fov','Field of view',55,110,1)}${r('sc','Render scale (lower = faster)',.5,1,.05)}${r('sens','Look sensitivity',.3,3,.1)}<label><input type=checkbox ${S.coords?'checked':''} onchange="A.set('coords',this.checked?1:0)"> Show coordinates</label><br><small>Lower render distance and render scale on older phones or TVs.</small></div>`};
+/* ---------- boot ---------- */
+(async()=>{if(!gl){$('#mbody').innerHTML='<div class=card>WebGL is not available on this device.</div>';return}
+ try{packs=await dbAll('packs')}catch(e){}packs.sort((a,b)=>a.order-b.order);ax.imageSmoothingEnabled=false;await applyPacks();menu('play');
+ if(!navigator.storage||!navigator.storage.persist)return;navigator.storage.persist()})();
+</script></body></html>
