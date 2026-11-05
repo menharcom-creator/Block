@@ -1,0 +1,7 @@
+{
+  "appId": "com.blockforge.game",
+  "appName": "BlockForge",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "ios": { "contentInset": "never" }
+}
